@@ -10,9 +10,10 @@ struct hash_move {
 	UT_hash_handle hh; // Makes this structure hashable
 };
 
-#define PID 2
-#define NUM_PROCESSES 3 // Max of 7
+#define PID 3 // Start from 0
+#define NUM_PROCESSES 4 // Max of 7
 #define MAX_DEPTH 200 // Game should come nowhere near this number of turns
+#define MAX_LEAD 15
 #define MAX_NORTH_BEADS 20
 #define SOUTH 0
 #define NORTH 1
@@ -34,9 +35,9 @@ void convert_board_to_string(int depth, char *destination) {
 }
 
 int check_game_over(int depth) {
-	if (board_states[depth][7] > 49) {
+	if (board_states[depth][7] > 49 || (board_states[depth][7] > board_states[depth][15] + MAX_LEAD)) {
 		return 1; // SOUTH WINS
-	} else if (board_states[depth][15] > MAX_NORTH_BEADS) {
+	} else if (board_states[depth][15] || (board_states[depth][15] > board_states[depth][7] + MAX_LEAD)) {
 		return -1; // NORTH WINS
 	} else if (board_states[depth][7] == 49 && board_states[depth][15] == 49) {
 		return 0; // TIE GAME
@@ -153,7 +154,7 @@ double trace(int depth, int player) {
 
 void write_to_file() {
 	struct hash_move *i;
-	sprintf(board, "board_states_%d_of_%d.txt", PID, NUM_PROCESSES);
+	sprintf(board, "board_states_%d_of_%d.txt", (PID + 1), NUM_PROCESSES);
     FILE *fp = fopen(board, "w+");
 
     for(i = best_moves; i != NULL; i = i->hh.next) {
@@ -174,14 +175,15 @@ int main() {
 	}
 
 	// Calculate the minimum and maximum move offsets
-	int pid = PID - 1;
-	minimum_move_offset = pid * ((int)(7 / NUM_PROCESSES));
-	maximum_move_offset = PID * ((int)(7 / NUM_PROCESSES));
-	for (int i = 0; i < 7 % NUM_PROCESSES && i < pid; i++) {
+	minimum_move_offset = PID * ((int)(7 / NUM_PROCESSES));
+	for (int i = 0; i < 7 % NUM_PROCESSES && i < PID; i++) {
 		minimum_move_offset++;
-		maximum_move_offset++;
 	}
-	maximum_move_offset = 7 - maximum_move_offset - 1;
+	int num_moves = ((int)(7 / NUM_PROCESSES));
+	if (PID < 7 % NUM_PROCESSES) {
+		num_moves++;
+	}
+	maximum_move_offset = 7 - minimum_move_offset - num_moves;
 
 	// Should hopefully output 1 (meaning we are guaranteed to win as SOUTH)
 	printf("Best guaranteed result for SOUTH: %f\n", trace(0, SOUTH));
