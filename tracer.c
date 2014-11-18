@@ -10,10 +10,9 @@ struct hash_move {
 	UT_hash_handle hh; // Makes this structure hashable
 };
 
-#define PID 3 // Start from 0
+#define PID 1 // Start from 0
 #define NUM_PROCESSES 4 // Max of 7
 #define MAX_DEPTH 200 // Game should come nowhere near this number of turns
-#define MAX_LEAD 15
 #define MAX_NORTH_BEADS 20
 #define SOUTH 0
 #define NORTH 1
@@ -34,10 +33,11 @@ void convert_board_to_string(int depth, char *destination) {
 	destination += sprintf(destination, "%d", board_states[depth][15]);
 }
 
+// Possible approx: if (board_states[depth][7] > board_states[depth][15] + 15) SOUTH wins, vice versa
 int check_game_over(int depth) {
-	if (board_states[depth][7] > 49 || (board_states[depth][7] > board_states[depth][15] + MAX_LEAD)) {
+	if (board_states[depth][7] > 49) {
 		return 1; // SOUTH WINS
-	} else if (board_states[depth][15] || (board_states[depth][15] > board_states[depth][7] + MAX_LEAD)) {
+	} else if (board_states[depth][15]) {
 		return -1; // NORTH WINS
 	} else if (board_states[depth][7] == 49 && board_states[depth][15] == 49) {
 		return 0; // TIE GAME
@@ -114,19 +114,25 @@ double trace(int depth, int player) {
 			board_states[depth + 1][14 - end_point] = 0;
 		}
 
-		if (end_point == player_kalah) { // Free turn
-			subtree_best_result = trace(depth + 1, player); // Should never be -2 or 2
+		if (end_point == player_kalah && depth != 0) { // Free turn (not on first turn)
+			subtree_best_result = trace(depth + 1, player);
 		} else {
-			subtree_best_result = trace(depth + 1, opposite_player); // Should never be -2 or 2
+			subtree_best_result = trace(depth + 1, opposite_player);
 		}
 
 		if (player == SOUTH) {
 			if (subtree_best_result > best_result) { // SOUTH wants to maximise best_result
 				best_move = move;
 				best_result = subtree_best_result;
+				if (best_result == 1) {
+					break; // Cut when SOUTH can force a win from this board state
+				}
 			}
 		} else if (subtree_best_result < best_result) { // NORTH wants to minimise best_result
 			best_result = subtree_best_result;
+			if (best_result == -1){
+				break; // Cut when NORTH can force a loss from this board state
+			}
 		}
 	}
 
@@ -139,7 +145,7 @@ double trace(int depth, int player) {
 			board_states[depth][move] = 0;
 		}
 		best_result = check_game_over(depth); // Should not return -99 at this point
-	} else if (player == SOUTH) {
+	} else if (player == SOUTH && best_result != -1) { // Don't hash losing board states to save space
 		// Hash the best move and win percentage with respect to board layout
 		struct hash_move *best_move_hash = (struct hash_move*) malloc(
 				sizeof(struct hash_move));
