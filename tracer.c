@@ -7,13 +7,11 @@ struct hash_move {
 	char state[41]; // Key (string is WITHIN the structure)
 	int move;
 	int result;
+	int depth;
 	UT_hash_handle hh; // Makes this structure hashable
 };
 
-#define PID 1 // Start from 0
-#define NUM_PROCESSES 4 // Max of 7
 #define MAX_DEPTH 200 // Game should come nowhere near this number of turns
-#define MAX_NORTH_BEADS 20
 #define SOUTH 0
 #define NORTH 1
 
@@ -24,7 +22,6 @@ struct hash_move {
 int board_states[MAX_DEPTH][16];
 struct hash_move *best_moves = NULL;
 char board[41];
-int minimum_move_offset, maximum_move_offset;
 
 void convert_board_to_string(int depth, char *destination) {
 	for (int i = 0; i < 15; i++) {
@@ -33,11 +30,10 @@ void convert_board_to_string(int depth, char *destination) {
 	destination += sprintf(destination, "%d", board_states[depth][15]);
 }
 
-// Possible approx: if (board_states[depth][7] > board_states[depth][15] + 15) SOUTH wins, vice versa
 int check_game_over(int depth) {
 	if (board_states[depth][7] > 49) {
 		return 1; // SOUTH WINS
-	} else if (board_states[depth][15]) {
+	} else if (board_states[depth][15] > 49) {
 		return -1; // NORTH WINS
 	} else if (board_states[depth][7] == 49 && board_states[depth][15] == 49) {
 		return 0; // TIE GAME
@@ -48,7 +44,7 @@ int check_game_over(int depth) {
 
 // Calculate the best move and eventual outcome for the
 // board state in board_states[depth]
-double trace(int depth, int player) {
+int trace(int depth, int player) {
 	// Check if the game is won/lost/tied in this board state
 	int game_status = check_game_over(depth);
 	if (game_status != -99) {
@@ -70,18 +66,13 @@ double trace(int depth, int player) {
 	int opposite_player = (player + 1) % 2;
 	int opposite_player_offset = opposite_player * 8;
 	int opposite_player_kalah = opposite_player_offset + 7;
-	int best_move = -1, best_result = -2, subtree_best_result, min_move = 0, max_move = 0;
+	int best_move = -1, best_result = -2, subtree_best_result;
 	if (player == NORTH) {
 		best_result = 2;
 	}
 
-	// Separate the top level game subtrees
-	if (depth == 0) {
-		min_move = minimum_move_offset;
-		max_move = maximum_move_offset;
-	}
-
-	for (int move = player_offset + min_move; move < player_kalah - max_move; move++) {
+	// Calculate the end result of performing each possible move on the board state
+	for (int move = player_offset; move < player_kalah; move++) {
 		int beads = board_states[depth][move];
 		if (beads == 0) { // Skip empty wells
 			continue;
@@ -95,13 +86,11 @@ double trace(int depth, int player) {
 		board_states[depth + 1][move] = 0;
 
 		int offset = 0; // Used to skip the opposite player's kalah
-		for (int i = 1; i <= beads; i++) {
-			// Skip other player's kalah
+		for (int i = 1; i <= beads; i++) { // Sow
 			if ((move + i + offset) % 16 == opposite_player_kalah) {
-				offset++;
+				offset++; // Skip other player's kalah
 			}
-
-			board_states[depth + 1][(move + i + offset) % 16]++; // Sow
+			board_states[depth + 1][(move + i + offset) % 16]++;
 		}
 
 		int end_point = (move + beads + offset) % 16;
@@ -130,7 +119,7 @@ double trace(int depth, int player) {
 			}
 		} else if (subtree_best_result < best_result) { // NORTH wants to minimise best_result
 			best_result = subtree_best_result;
-			if (best_result == -1){
+			if (best_result == -1) {
 				break; // Cut when NORTH can force a loss from this board state
 			}
 		}
@@ -145,27 +134,42 @@ double trace(int depth, int player) {
 			board_states[depth][move] = 0;
 		}
 		best_result = check_game_over(depth); // Should not return -99 at this point
-	} else if (player == SOUTH && best_result != -1) { // Don't hash losing board states to save space
-		// Hash the best move and win percentage with respect to board layout
+	} else if (player == SOUTH && best_result > -1) { // Don't hash losing board states to save space
+	// Hash the best move and win percentage with respect to board layout
 		struct hash_move *best_move_hash = (struct hash_move*) malloc(
 				sizeof(struct hash_move));
 		convert_board_to_string(depth, best_move_hash->state);
 		best_move_hash->move = best_move;
 		best_move_hash->result = best_result;
+		best_move_hash->depth = depth; // Hash depth to help sort board states
 		HASH_ADD_STR(best_moves, state, best_move_hash);
 	}
 
 	return best_result;
 }
 
-void write_to_file() {
-	struct hash_move *i;
-	sprintf(board, "board_states_%d_of_%d.txt", (PID + 1), NUM_PROCESSES);
-    FILE *fp = fopen(board, "w+");
+int sort_hashes(struct hash_move *a, struct hash_move *b) {
+	if (a->depth < b->depth) {
+		return -1;
+	} else if (a->depth == b->depth) {
+		return 0;
+	} else {
+		return 1;
+	}
+}
 
-    for(i = best_moves; i != NULL; i = i->hh.next) {
+// Sort and write all the collected board states to a file
+void write_to_file(int num) {
+	// Sort the hashes
+	HASH_SORT(best_moves, sort_hashes);
+
+	struct hash_move *i;
+	sprintf(board, "board_states_%d.txt", num);
+	FILE *fp = fopen(board, "w+");
+
+	for (i = best_moves; i != NULL; i = i->hh.next) {
 		fprintf(fp, "%s#%d#%d\n", i->state, i->move, i->result);
-    }
+	}
 
 	fclose(fp);
 }
@@ -180,22 +184,15 @@ int main() {
 		}
 	}
 
-	// Calculate the minimum and maximum move offsets
-	minimum_move_offset = PID * ((int)(7 / NUM_PROCESSES));
-	for (int i = 0; i < 7 % NUM_PROCESSES && i < PID; i++) {
-		minimum_move_offset++;
-	}
-	int num_moves = ((int)(7 / NUM_PROCESSES));
-	if (PID < 7 % NUM_PROCESSES) {
-		num_moves++;
-	}
-	maximum_move_offset = 7 - minimum_move_offset - num_moves;
+	printf("Enter a number for the text file: ");
+	int num;
+	scanf("%d", &num);
 
 	// Should hopefully output 1 (meaning we are guaranteed to win as SOUTH)
-	printf("Best guaranteed result for SOUTH: %f\n", trace(0, SOUTH));
+	printf("Best guaranteed result for SOUTH: %d\n", trace(0, SOUTH));
 
 	printf("Beginning write to file process.");
-	write_to_file();
+	write_to_file(num);
 
 	return 0;
 }
