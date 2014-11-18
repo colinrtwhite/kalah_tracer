@@ -44,7 +44,7 @@ int check_game_over(int depth) {
 
 // Calculate the best move and eventual outcome for the
 // board state in board_states[depth]
-int trace(int depth, int player) {
+int trace(int depth, int player, int start_move, int end_move) {
 	// Check if the game is won/lost/tied in this board state
 	int game_status = check_game_over(depth);
 	if (game_status != -99) {
@@ -72,7 +72,7 @@ int trace(int depth, int player) {
 	}
 
 	// Calculate the end result of performing each possible move on the board state
-	for (int move = player_offset; move < player_kalah; move++) {
+	for (int move = player_offset + start_move; move < player_kalah - (6 - end_move); move++) {
 		int beads = board_states[depth][move];
 		if (beads == 0) { // Skip empty wells
 			continue;
@@ -104,9 +104,9 @@ int trace(int depth, int player) {
 		}
 
 		if (end_point == player_kalah && depth != 0) { // Free turn (not on first turn)
-			subtree_best_result = trace(depth + 1, player);
+			subtree_best_result = trace(depth + 1, player, 0, 7);
 		} else {
-			subtree_best_result = trace(depth + 1, opposite_player);
+			subtree_best_result = trace(depth + 1, opposite_player, 0, 7);
 		}
 
 		if (player == SOUTH) {
@@ -159,12 +159,12 @@ int sort_hashes(struct hash_move *a, struct hash_move *b) {
 }
 
 // Sort and write all the collected board states to a file
-void write_to_file(int num) {
+void write_to_file(int start_move, int end_move) {
 	// Sort the hashes
 	HASH_SORT(best_moves, sort_hashes);
 
 	struct hash_move *i;
-	sprintf(board, "board_states_%d.txt", num);
+	sprintf(board, "board_states_%d_to_%d.txt", start_move, end_move);
 	FILE *fp = fopen(board, "w+");
 
 	for (i = best_moves; i != NULL; i = i->hh.next) {
@@ -184,15 +184,17 @@ int main() {
 		}
 	}
 
-	printf("Enter a number for the text file: ");
-	int num;
-	scanf("%d", &num);
+	int start_move, end_move;
+	printf("Enter the minimum first move choice at depth 0: ");
+	scanf("%d", &start_move);
+	printf("Enter the maximum first move choice at depth 0: ");
+	scanf("%d", &end_move);
 
 	// Should hopefully output 1 (meaning we are guaranteed to win as SOUTH)
-	printf("Best guaranteed result for SOUTH: %d\n", trace(0, SOUTH));
+	printf("Best guaranteed result for SOUTH: %d\n", trace(0, SOUTH, start_move, end_move));
 
-	printf("Beginning write to file process.");
-	write_to_file(num);
+	printf("Beginning sort and write to file process.");
+	write_to_file(start_move, end_move);
 
 	return 0;
 }
