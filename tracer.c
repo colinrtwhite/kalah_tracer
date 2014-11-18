@@ -11,7 +11,7 @@ struct hash_move {
 	UT_hash_handle hh; // Makes this structure hashable
 };
 
-#define MAX_DEPTH 200 // Game should come nowhere near this number of turns
+#define MAX_DEPTH 50
 #define SOUTH 0
 #define NORTH 1
 
@@ -33,7 +33,7 @@ void convert_board_to_string(int depth, char *destination) {
 int check_game_over(int depth) {
 	if (board_states[depth][7] > 49) {
 		return 1; // SOUTH WINS
-	} else if (board_states[depth][15] > 49) {
+	} else if (board_states[depth][15] > 49 || depth == MAX_DEPTH) {
 		return -1; // NORTH WINS
 	} else if (board_states[depth][7] == 49 && board_states[depth][15] == 49) {
 		return 0; // TIE GAME
@@ -104,9 +104,9 @@ int trace(int depth, int player, int start_move, int end_move) {
 		}
 
 		if (end_point == player_kalah && depth != 0) { // Free turn (not on first turn)
-			subtree_best_result = trace(depth + 1, player, 0, 7);
+			subtree_best_result = trace(depth + 1, player, 0, 6);
 		} else {
-			subtree_best_result = trace(depth + 1, opposite_player, 0, 7);
+			subtree_best_result = trace(depth + 1, opposite_player, 0, 6);
 		}
 
 		if (player == SOUTH) {
