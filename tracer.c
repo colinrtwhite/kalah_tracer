@@ -168,7 +168,7 @@ void write_to_file(int start_move, int end_move) {
 	FILE *fp = fopen(board, "w+");
 
 	for (i = best_moves; i != NULL; i = i->hh.next) {
-		fprintf(fp, "%s#%d#%d\n", i->state, i->move, i->result);
+		fprintf(fp, "%d#%s#%d#%d\n", i->depth, i->state, i->move, i->result);
 	}
 
 	fclose(fp);
