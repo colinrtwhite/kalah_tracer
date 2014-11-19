@@ -45,7 +45,7 @@ int sort_hashes(struct hash_item *a, struct hash_item *b) {
 // Sort and write all the collected board states to a file
 // and clear the hash table
 void write_to_file() {
-	fprintf(stderr, "Beginning sort and write to file process %d.", num_files);
+	fprintf(stderr, "Beginning sort and write to file process %d.\n", num_files);
 	// Sort the hashes
 	HASH_SORT(game_tree, sort_hashes);
 
