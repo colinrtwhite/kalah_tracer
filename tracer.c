@@ -11,7 +11,7 @@ struct hash_item {
 };
 
 #define MAX_DEPTH 200
-#define MAX_HASHES 20000000
+#define MAX_HASHES 15000000
 #define SOUTH 0
 #define NORTH 1
 
