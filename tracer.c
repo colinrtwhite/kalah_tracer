@@ -5,14 +5,13 @@
 
 struct hash_item {
 	char state[41]; // Key (string is WITHIN the structure)
-	int move;
-	int result;
 	int depth;
+	int move;
 	UT_hash_handle hh; // Makes this structure hashable
 };
 
-#define MAX_DEPTH 40
-#define MAX_HASHES 15000000
+#define MAX_DEPTH 200
+#define MAX_HASHES 20000000
 #define SOUTH 0
 #define NORTH 1
 
@@ -24,6 +23,18 @@ int board_states[MAX_DEPTH][16];
 struct hash_item *game_tree = NULL;
 char board[41];
 int first_move, num_files;
+
+int check_game_over(int depth) {
+	if (board_states[depth][7] > 49 || depth == MAX_DEPTH) {
+		return 1; // SOUTH WINS
+	} else if (board_states[depth][15] > 49) {
+		return -1; // NORTH WINS
+	} else if (board_states[depth][7] == 49 && board_states[depth][15] == 49) {
+		return 0; // TIE GAME
+	} else {
+		return -99; // GAME IS NOT OVER
+	}
+}
 
 void convert_board_to_string(int depth, char *destination) {
 	for (int i = 0; i < 15; i++) {
@@ -45,35 +56,23 @@ int sort_hashes(struct hash_item *a, struct hash_item *b) {
 // Sort and write all the collected board states to a file
 // and clear the hash table
 void write_to_file() {
-	fprintf(stderr, "Beginning sort and write to file process %d.\n", num_files);
-	// Sort the hashes
-	HASH_SORT(game_tree, sort_hashes);
-
+	fprintf(stderr, "Beginning sort and write to file process %d.\n",
+			num_files);
+	HASH_SORT(game_tree, sort_hashes); // Sort the hashes
 	sprintf(board, "board_states_for_%d_num_%d.txt", first_move, num_files);
 	FILE *fp = fopen(board, "w+");
-	struct hash_item *i, *tmp;
 
+	struct hash_item *i, *tmp;
 	HASH_ITER(hh, game_tree, i, tmp)
 	{
-		fprintf(fp, "%d~%s~%d~%d\n", i->depth, i->state, i->move, i->result);
+		fprintf(fp, "%d~%s~%d\n", i->depth, i->state, i->move);
 		HASH_DEL(game_tree, i);
 		free(i);
 	}
 
 	fclose(fp);
 	num_files++;
-}
-
-int check_game_over(int depth) {
-	if (board_states[depth][7] > 49) {
-		return 1; // SOUTH WINS
-	} else if (board_states[depth][15] > 49 || depth == MAX_DEPTH) {
-		return -1; // NORTH WINS
-	} else if (board_states[depth][7] == 49 && board_states[depth][15] == 49) {
-		return 0; // TIE GAME
-	} else {
-		return -99; // GAME IS NOT OVER
-	}
+	fprintf(stderr, "Sort and write to file process %d complete.\n", num_files);
 }
 
 // Calculate the best move and eventual outcome for the
@@ -91,8 +90,8 @@ int trace(int depth, int player) {
 	HASH_FIND_STR(game_tree, board, entry);
 	if (entry) {
 		// This board state is identical to a previous point in the game tree,
-		// which has already been explored
-		return entry->result;
+		// (where SOUTH won) which has already been explored
+		return 1;
 	}
 
 	int player_offset = player * 8;
@@ -167,12 +166,11 @@ int trace(int depth, int player) {
 			board_states[depth][move] = 0;
 		}
 		best_result = check_game_over(depth); // Should not return -99 at this point
-	} else if (player == SOUTH && best_result > -1) { // Don't hash losing board states to save space
+	} else if (player == SOUTH && best_result == 1) { // Only hash board states that lead to a win to save space
 		struct hash_item *best_move_hash = (struct hash_item*) malloc(
 				sizeof(struct hash_item));
 		convert_board_to_string(depth, best_move_hash->state);
 		best_move_hash->move = best_move;
-		best_move_hash->result = best_result;
 		best_move_hash->depth = depth; // Hash depth to help sort board states
 		// Hash the best move and win percentage with respect to board layout
 		HASH_ADD_STR(game_tree, state, best_move_hash);
