@@ -71,8 +71,8 @@ void write_to_file() {
 	}
 
 	fclose(fp);
-	num_files++;
 	fprintf(stderr, "Sort and write to file process %d complete.\n", num_files);
+	num_files++;
 }
 
 // Calculate the best move and eventual outcome for the
