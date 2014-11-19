@@ -25,7 +25,7 @@ char board[41];
 int first_move, num_files;
 
 int check_game_over(int depth) {
-	if (board_states[depth][7] > 49 || depth == MAX_DEPTH) {
+	if (board_states[depth][7] > 49) {
 		return 1; // SOUTH WINS
 	} else if (board_states[depth][15] > 49) {
 		return -1; // NORTH WINS
