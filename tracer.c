@@ -195,6 +195,7 @@ int main() {
 	printf("Best guaranteed result for SOUTH: %d\n", trace(0, SOUTH));
 
 	write_to_file();
+	scanf("%s", board); // Wait for user input to end (needed to see final output on Windows)
 
 	return 0;
 }
