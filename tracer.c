@@ -177,7 +177,7 @@ void __write_to_file(struct node *self, int depth, FILE *fp) {
 // Write the resulting tree in a compressed format to a .txt file
 void write_to_file(struct node *game_tree, int first_move, int max_min) {
 	char file_name[7];
-	sprintf(file_name, "N%d.txt", first_move);
+	sprintf(file_name, "S%d.txt", first_move);
 	FILE *fp = fopen(file_name, "w+");
 
 	fprintf(fp, "%d", max_min);
@@ -189,11 +189,9 @@ void write_to_file(struct node *game_tree, int first_move, int max_min) {
 int main(int argc, char *argv[]) {
 	if (argc != 2) {
 		fprintf(stderr,
-				"Need one command line argument (representing first North move).\n");
+				"Need one command line argument (representing first SOUTH move).\n");
 		return 1;
 	}
-
-	time_t start = time(NULL);
 
 	// Initialise the starting board
 	for (int i = 0; i < 16; i++) {
@@ -219,8 +217,6 @@ int main(int argc, char *argv[]) {
 
 	// Trace the game tree then write it to a file
 	write_to_file(root, first_move, trace(1, 1, root, north, south));
-
-	fprintf(stderr, "Run time: %.2f minute(s)\n", difftime(time(NULL), start) / 60);
 
 	return 0;
 }
