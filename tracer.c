@@ -8,14 +8,14 @@ struct node {
 	struct node *children[7];
 };
 
-struct player {
+struct side {
 	int id;
 	int offset;
 	int kalah;
 };
 
-#define MAX_SOUTH_MOVES 7
-#define MAX_RECORDED_SOUTH_MOVES (MAX_SOUTH_MOVES - 2)
+#define MAX_PLAYER_MOVES 6
+#define MAX_RECORDED_PLAYER_MOVES (MAX_PLAYER_MOVES - 2)
 #define MAX_DEPTH 25
 #define SOUTH 0
 #define NORTH 1
@@ -25,21 +25,22 @@ struct player {
 // 8 to 14 are NORTH's wells
 // 15 is NORTH's kalah
 int board_states[MAX_DEPTH][16];
+struct side *player, *opponent;
 
 int check_game_over(int depth, int num_south_moves) {
-	if (board_states[depth][7] > 49) {
-		return 99; // SOUTH WINS
-	} else if (board_states[depth][15] > 49) {
-		return -99; // NORTH WINS
-	} else if (num_south_moves == MAX_SOUTH_MOVES) {
-		return board_states[depth][7] - board_states[depth][15]; // END OF TREE EXPLORATION
+	if (board_states[depth][player->kalah] > 49) {
+		return 99; // PLAYER WINS
+	} else if (board_states[depth][opponent->kalah] > 49) {
+		return -99; // OPPONENT WINS
+	} else if (num_south_moves == MAX_PLAYER_MOVES) {
+		return board_states[depth][player->kalah] - board_states[depth][opponent->kalah]; // END OF TREE EXPLORATION
 	} else {
 		return 100; // GAME IS NOT OVER
 	}
 }
 
-int make_move(int depth, int move, struct player *player,
-		struct player *opposite_player) {
+int make_move(int depth, int move, struct side *current_player,
+		struct side *opposite_player) {
 	int beads = board_states[depth][move];
 
 	// Copy the board state from depth to depth + 1 so it can be modified
@@ -59,10 +60,10 @@ int make_move(int depth, int move, struct player *player,
 
 	int end_point = (move + beads + offset) % 16;
 	// Capture the other player's beads from the opposite well
-	if (end_point >= player->offset * 8 && end_point < player->kalah
+	if (end_point >= current_player->offset * 8 && end_point < current_player->kalah
 			&& board_states[depth + 1][end_point] == 1) {
 		board_states[depth + 1][end_point] = 0;
-		board_states[depth + 1][player->kalah] += board_states[depth + 1][14
+		board_states[depth + 1][current_player->kalah] += board_states[depth + 1][14
 				- end_point] + 1;
 		board_states[depth + 1][14 - end_point] = 0;
 	}
@@ -91,7 +92,7 @@ void free_subtree(struct node *self) {
 // Calculate the best move and eventual outcome for the
 // board state in board_states[depth]
 int trace(int depth, int num_south_moves, struct node *self,
-		struct player *player, struct player *opposite_player) {
+		struct side *current_player, struct side *opposite_player) {
 	// Check if the game is won/lost/tied in this board state
 	int game_status = check_game_over(depth, num_south_moves);
 	if (game_status != 100) {
@@ -99,12 +100,12 @@ int trace(int depth, int num_south_moves, struct node *self,
 	}
 
 	int subtree_result, best_move = -1;
-	int max_min_result = (player->id == SOUTH) ? -100 : 100;
+	int max_min_result = (current_player->id == player->id) ? -100 : 100;
 	int new_num_south_moves =
-			(player->id == SOUTH) ? num_south_moves + 1 : num_south_moves;
+			(current_player->id == player->id) ? num_south_moves + 1 : num_south_moves;
 
 	// Calculate the end result of performing each possible move on the board state
-	for (int move = player->offset; move < player->kalah; move++) {
+	for (int move = current_player->offset; move < current_player->kalah; move++) {
 		if (board_states[depth][move] == 0) {
 			continue; // Skip empty wells
 		}
@@ -113,22 +114,22 @@ int trace(int depth, int num_south_moves, struct node *self,
 		clear_children(child);
 		self->children[move % 8] = child;
 
-		if (make_move(depth, move, player, opposite_player) == player->kalah) {
-			child->player = player->id;
-			subtree_result = trace(depth + 1, num_south_moves, child, player,
+		if (make_move(depth, move, current_player, opposite_player) == current_player->kalah && depth > 0) {
+			child->player = current_player->id;
+			subtree_result = trace(depth + 1, num_south_moves, child, current_player,
 					opposite_player); // Free turn
 		} else {
 			child->player = opposite_player->id;
 			subtree_result = trace(depth + 1, new_num_south_moves, child,
-					opposite_player, player);
+					opposite_player, current_player);
 		}
 
-		if (player->id == SOUTH) {
-			if (subtree_result > max_min_result) { // SOUTH wants to maximise best_result
+		if (current_player->id == player->id) {
+			if (subtree_result > max_min_result) { // Player wants to maximise max_min_result
 				best_move = move;
 				max_min_result = subtree_result;
 			}
-		} else if (subtree_result < max_min_result) { // NORTH wants to minimise best_result
+		} else if (subtree_result < max_min_result) { // Opponent wants to minimise max_min_result
 			max_min_result = subtree_result;
 		}
 	}
@@ -142,10 +143,10 @@ int trace(int depth, int num_south_moves, struct node *self,
 			board_states[depth][move] = 0;
 		}
 		max_min_result = check_game_over(depth, num_south_moves); // Will not return 100
-	} else if (player->id == SOUTH
-			|| num_south_moves == MAX_RECORDED_SOUTH_MOVES) { // Free not useful/necessary trees
+	} else if (current_player->id == player->id
+			|| num_south_moves == MAX_RECORDED_PLAYER_MOVES) { // Free not useful/necessary trees
 		best_move =
-				(num_south_moves == MAX_RECORDED_SOUTH_MOVES) ? -1 : best_move;
+				(num_south_moves == MAX_RECORDED_PLAYER_MOVES) ? -1 : best_move;
 		for (int i = 0; i < 7; i++) {
 			if (self->children[i] != NULL && i != best_move) {
 				free_subtree(self->children[i]);
@@ -162,7 +163,7 @@ void __write_to_file(struct node *self, int depth, FILE *fp) {
 
 	for (int i = 0; i < 7; i++) {
 		if (self->children[i] != NULL) {
-			if (self->player == SOUTH) {
+			if (self->player == player->id) {
 				fprintf(fp, "%d", i); // Best move for this turn
 			} else {
 				fprintf(fp, "\n%x%d", depth, i);
@@ -175,9 +176,13 @@ void __write_to_file(struct node *self, int depth, FILE *fp) {
 }
 
 // Write the resulting tree in a compressed format to a .txt file
-void write_to_file(struct node *game_tree, int first_move, int max_min) {
+void write_to_file(struct node *game_tree, char *side, int first_move, int max_min) {
 	char file_name[7];
-	sprintf(file_name, "N%d.txt", first_move);
+	if (player == SOUTH) {
+		sprintf(file_name, "%s%d.txt", side, first_move);
+	} else {
+		sprintf(file_name, "%s.txt", side);
+	}
 	FILE *fp = fopen(file_name, "w+");
 
 	fprintf(fp, "%d", max_min);
@@ -187,9 +192,8 @@ void write_to_file(struct node *game_tree, int first_move, int max_min) {
 }
 
 int main(int argc, char *argv[]) {
-	if (argc != 2) {
-		fprintf(stderr,
-				"Need one command line argument (representing first North move).\n");
+	if (argc != 2 && argc != 3) {
+		fprintf(stderr, "Need one or two command line arguments.\n");
 		return 1;
 	}
 
@@ -201,24 +205,35 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Set up players
-	struct player *south = (struct player*) malloc(sizeof(struct player));
+	struct side *south = (struct side*) malloc(sizeof(struct side));
 	south->id = SOUTH;
 	south->offset = 0;
 	south->kalah = 7;
-	struct player *north = (struct player*) malloc(sizeof(struct player));
+	struct side *north = (struct side*) malloc(sizeof(struct side));
 	north->id = NORTH;
 	north->offset = 8;
 	north->kalah = 15;
+	player = (strcmp(argv[1], "S") == 0) ? south : north;
+	opponent = (strcmp(argv[1], "S") == 0) ? north : south;
 
 	// Make the first move
-	int first_move = (int) strtol(argv[1], NULL, 10);
-	make_move(0, first_move, south, north); // Don't need to worry about capturing or free move
+	int first_move = 0;
+	if (player->id == SOUTH) {
+		first_move = (int) strtol(argv[2], NULL, 10);
+		make_move(0, first_move, south, north); // Don't need to worry about capturing or free move on first turn
+	}
 	struct node *root = (struct node*) malloc(sizeof(struct node));
 	clear_children(root);
 	root->player = NORTH;
 
 	// Trace the game tree then write it to a file
-	write_to_file(root, first_move, trace(1, 1, root, north, south));
+	int max_min;
+	if (player->id == SOUTH) {
+		max_min = trace(1, 1, root, north, south);
+	} else {
+		max_min = trace(0, 0, root, south, north);
+	}
+	write_to_file(root, argv[1], first_move, max_min);
 
 	fprintf(stderr, "Run time: %.2f minute(s)\n", difftime(time(NULL), start) / 60);
 
