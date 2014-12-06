@@ -33,6 +33,7 @@ struct return_struct {
 // 8 to 14 are NORTH's wells
 // 15 is NORTH's kalah
 int board_states[MAX_DEPTH][16];
+char *depth_tokens = "0123456789abcdefghijklmnopqrstuvwxyz";
 struct side *us, *them;
 
 // Check if the board state at depth is complete
@@ -154,7 +155,7 @@ struct return_struct* trace(int depth, int num_moves, struct node *self,
 					player);
 		}
 
-		if (subtree_result->height_from_leaf > return_value->height_from_leaf) {
+		if (subtree_result->height_from_leaf >= return_value->height_from_leaf) {
 			return_value->height_from_leaf = subtree_result->height_from_leaf
 					+ 1;
 		}
@@ -210,7 +211,7 @@ void __write_to_file(struct node *self, int depth, FILE *fp) {
 			if (self->player == us->id) {
 				fprintf(fp, "%d", i); // Best move for this turn
 			} else {
-				fprintf(fp, "\n%x%d", depth, i);
+				fprintf(fp, "\n%c%d", depth_tokens[depth], i);
 			}
 			__write_to_file(self->children[i], new_depth, fp);
 		}
@@ -230,7 +231,7 @@ void write_to_file(struct node *game_tree, char *side_str, int first_move,
 	if (us->id == NORTH) {
 		fprintf(fp, "\n");
 	}
-	__write_to_file(game_tree, 1, fp);
+	__write_to_file(game_tree, 0, fp);
 
 	fclose(fp);
 }

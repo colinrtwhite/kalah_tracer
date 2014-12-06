@@ -112,4 +112,5 @@
 			<resource resourceType="PROJECT" workspacePath="/Kalah"/>
 		</configuration>
 	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
 </cproject>
