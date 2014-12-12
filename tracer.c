@@ -19,8 +19,8 @@ struct return_struct {
 	int is_reduced;
 };
 
-#define MAX_MOVES 7
-#define PREDICTION_DEPTH 8
+#define MAX_MOVES 6
+#define PREDICTION_DEPTH 0
 #define MAX_DEPTH 200
 #define SOUTH 0
 #define NORTH 1
@@ -163,7 +163,7 @@ struct return_struct* trace(int depth, int num_moves, struct node *self,
 			return_value->is_reduced = subtree_result->is_reduced;
 		}
 		if (player->id == us->id) {
-			if (subtree_result->max_min > return_value->max_min) { // WE want to maximise max_min_result
+			if (subtree_result->max_min >= return_value->max_min) { // WE want to maximise max_min_result
 				best_move = move % 8;
 				return_value->max_min = subtree_result->max_min;
 			}
